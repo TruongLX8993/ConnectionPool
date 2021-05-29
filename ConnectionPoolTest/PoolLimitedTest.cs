@@ -1,4 +1,5 @@
 ﻿using ConnectionPool;
+using ConnectionPool.DbConnectionFactory;
 using ConnectionPool.Exceptions;
 using NUnit.Framework;
 
@@ -8,10 +9,14 @@ namespace ConnectionPoolTest
     public class PoolLimitedTest
     {
         private PoolManager _poolManager;
+
         [SetUp]
         public void SetUp()
         {
-            _poolManager = new PoolManager(1, 1);
+            _poolManager = new PoolManager(new OracleDbConnectionFactory(),
+                1,
+                1, 
+                1);
         }
 
         [Test]
@@ -35,7 +40,7 @@ namespace ConnectionPoolTest
                 pool.GetConnection();
             });
         }
-        
+
         [TearDown]
         public void Clear()
         {

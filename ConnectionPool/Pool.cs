@@ -2,31 +2,34 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Linq.Expressions;
 using ConnectionPool.Exceptions;
 
 namespace ConnectionPool
 {
     public class Pool
     {
+        private readonly IDbConnectionFactory _dbConnectionFactory;
         private readonly string _dbConnectionString;
         private readonly int _maxPoolSize;
         private readonly int _lifeTimeMinutes;
-        private readonly int _cleanPoolThreaHold;
-        
-        private readonly Queue<Connection> _freeConnections;
+        private readonly int _cleanPoolThreshold;
 
+        private readonly Queue<Connection> _freeConnections;
         private readonly IDictionary<IDbConnection, Connection> _mapConnections;
 
-        public Pool(string dbConnectionString,
+        public Pool(IDbConnectionFactory dbConnectionFactory,
+            string dbConnectionString,
             int maxPoolSize,
-            int lifeTimeMinutes)
+            int lifeTimeMinutes,
+            int cleanPoolThreshold)
         {
+            _dbConnectionFactory = dbConnectionFactory;
             _dbConnectionString = dbConnectionString;
             _maxPoolSize = maxPoolSize;
             _lifeTimeMinutes = lifeTimeMinutes;
             _freeConnections = new Queue<Connection>();
             _mapConnections = new Dictionary<IDbConnection, Connection>();
+            _cleanPoolThreshold = cleanPoolThreshold;
         }
 
         public bool MatchConnectionString(string connection)
@@ -38,13 +41,14 @@ namespace ConnectionPool
         public IDbConnection GetConnection()
         {
             var dbConnection = GetConnectionFromQueue();
-            if (dbConnection != null)
+            if (dbConnection == null)
             {
-                return dbConnection;
+                CreateNewConnection();
+                dbConnection = GetConnectionFromQueue();
             }
 
-            CreateNewConnection();
-            return GetConnectionFromQueue();
+            TryClean();
+            return dbConnection;
         }
 
         private IDbConnection GetConnectionFromQueue()
@@ -52,8 +56,10 @@ namespace ConnectionPool
             while (_freeConnections.Count != 0)
             {
                 var connection = _freeConnections.Dequeue();
-                connection.State = ConnectionState.Busy;
-                return connection.DbConnection;
+                if (connection.State == ConnectionState.Free)
+                {
+                    return connection.DbConnection;
+                }
             }
 
             return null;
@@ -67,7 +73,7 @@ namespace ConnectionPool
                 throw new PoolLimitedException();
             }
 
-            var dbConnection = DbConnectionFactory.Create(_dbConnectionString);
+            var dbConnection = _dbConnectionFactory.CreateConnection(_dbConnectionString);
             var newConnection = new Connection(dbConnection, _lifeTimeMinutes) {State = ConnectionState.Free};
             _mapConnections.Add(dbConnection, newConnection);
             dbConnection.Open();
@@ -76,13 +82,18 @@ namespace ConnectionPool
 
         public int GetPoolSize()
         {
-            return _mapConnections.Count(val => val.Value.State != ConnectionState.Closed);
+            return _mapConnections.Count();
+        }
+
+        public int GetNumberConnectionFree()
+        {
+            return _freeConnections.Count;
         }
 
 
         public void ReleaseConnection(IDbConnection dbConnection)
         {
-            if(_mapConnections.ContainsKey(dbConnection))
+            if (_mapConnections.ContainsKey(dbConnection))
             {
                 var connection = _mapConnections[dbConnection];
                 connection.State = ConnectionState.Free;
@@ -91,6 +102,15 @@ namespace ConnectionPool
             else
             {
                 dbConnection.Close();
+            }
+        }
+
+        private void TryClean()
+        {
+            if (_cleanPoolThreshold > 1 &&
+                GetPoolSize() >= _cleanPoolThreshold)
+            {
+                CleanExpiredConnection();
             }
         }
 

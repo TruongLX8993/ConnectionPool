@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Threading;
 using ConnectionPool;
+using ConnectionPool.DbConnectionFactory;
 using NUnit.Framework;
 
 namespace ConnectionPoolTest
@@ -14,8 +15,11 @@ namespace ConnectionPoolTest
         [SetUp]
         public void SetUp()
         {
-             var poolManager = new PoolManager(1, 1);
-             _pool = poolManager.GetPool(Constance.ConnectionString);
+            var poolManager = new PoolManager(new OracleDbConnectionFactory(),
+                10,
+                1,
+                5);
+            _pool = poolManager.GetPool(Constance.ConnectionString);
         }
 
         [Test, Order(1)]

@@ -42,10 +42,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CleanPoolTest.cs" />
     <Compile Include="Constance.cs" />
     <Compile Include="PoolLimitedTest.cs" />
     <Compile Include="PoolSequenceTest.cs" />
     <Compile Include="RedundantConnectionTest.cs" />
+    <Compile Include="ReuseConnectionTest.cs" />
     <Compile Include="SimpleTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

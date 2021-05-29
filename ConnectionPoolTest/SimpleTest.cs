@@ -1,4 +1,5 @@
 ﻿using ConnectionPool;
+using ConnectionPool.DbConnectionFactory;
 using NUnit.Framework;
 using ConnectionState = System.Data.ConnectionState;
 
@@ -9,10 +10,13 @@ namespace ConnectionPoolTest
     {
         private PoolManager _poolManager;
 
-        [SetUp]
+        [OneTimeSetUp]
         public void SetUp()
         {
-            _poolManager = new PoolManager(1, 1);
+            _poolManager = new PoolManager(new OracleDbConnectionFactory(),
+                10,
+                1,
+                5);
         }
 
         [Test]
@@ -28,7 +32,6 @@ namespace ConnectionPoolTest
 
         public void LimitPool()
         {
-            
         }
 
         [TearDown]

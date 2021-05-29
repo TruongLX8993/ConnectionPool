@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data;
+using ConnectionPool.Exceptions;
 
 namespace ConnectionPool
 {
@@ -37,16 +38,17 @@ namespace ConnectionPool
 
         public bool IsExpired()
         {
-            return DateTime.Now.Subtract(_lastUpdateTime).TotalMinutes > _lifeTimeMinutes;
+            return _lifeTimeMinutes > 0 && DateTime.Now.Subtract(_lastUpdateTime).TotalMinutes > _lifeTimeMinutes;
         }
 
         public void Close()
         {
-            if (_state == ConnectionState.Closed)
+            if (_state != ConnectionState.Closed)
             {
-                DbConnection.Close();
-                DbConnection.Dispose();
+                throw new ConnectionPoolException("Pool is set closed state before close");
             }
+            DbConnection.Close();
+            DbConnection.Dispose();
         }
     }
 }

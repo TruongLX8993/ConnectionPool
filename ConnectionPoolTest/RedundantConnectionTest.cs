@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Threading;
 using ConnectionPool;
+using ConnectionPool.DbConnectionFactory;
 using NUnit.Framework;
 
 namespace ConnectionPoolTest
@@ -9,18 +10,24 @@ namespace ConnectionPoolTest
     public class RedundantConnectionTest
     {
         private readonly int _numberConnection;
+        private readonly int _cleanThresHold;
         private Pool _pool;
         private IDbConnection _dbConnection;
 
-        public RedundantConnectionTest(int numberConnection)
+        public RedundantConnectionTest(int numberConnection,int cleanThreshold)
         {
             _numberConnection = numberConnection;
+            _cleanThresHold = cleanThreshold;
+
         }
 
         [OneTimeSetUp]
         public void SetUp()
         {
-            var poolManager = new PoolManager(_numberConnection, 1);
+            var poolManager = new PoolManager(new OracleDbConnectionFactory(),
+                10,
+                1,
+                5);
             _pool = poolManager.GetPool(Constance.ConnectionString);
         }
 

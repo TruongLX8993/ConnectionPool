@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 
@@ -7,16 +8,27 @@ namespace ConnectionPool
     public class PoolManager
     {
         private readonly IDictionary<string, Pool> _dicPools;
-        private readonly int _maxSizePool;
+        private readonly int _maxPoolSize;
         private readonly int _maxLifeTimeMin;
+        private readonly int _cleanPoolThreshold;
+        private readonly IDbConnectionFactory _dbConnectionFactory;
 
-        public PoolManager(int maxPoolSize, int lifeTimeMin)
+        public PoolManager(
+            IDbConnectionFactory dbConnectionFactory,
+            int maxPoolSize,
+            int lifeTimeMin,
+            int cleanPoolThreshold)
         {
+            _dbConnectionFactory = dbConnectionFactory;
             _dicPools = new Dictionary<string, Pool>();
-            _maxSizePool = maxPoolSize;
+            _maxPoolSize = maxPoolSize;
             _maxLifeTimeMin = lifeTimeMin;
+            _cleanPoolThreshold = cleanPoolThreshold;
+            if (_cleanPoolThreshold > _maxPoolSize)
+            {
+                throw new ArgumentException("Max-pool-size cannot be less clean-threshold ");
+            }
         }
-
 
         public Pool GetPool(string connectionString)
         {
@@ -24,11 +36,16 @@ namespace ConnectionPool
             lock (_dicPools)
             {
                 if (_dicPools.ContainsKey(key)) return _dicPools[key];
-                _dicPools.Add(key, new Pool(connectionString, _maxSizePool, _maxLifeTimeMin));
+                var pool = new Pool(_dbConnectionFactory,
+                    connectionString,
+                    _maxPoolSize,
+                    _maxLifeTimeMin,
+                    _cleanPoolThreshold);
+                _dicPools.Add(key, pool);
                 return _dicPools[key];
             }
         }
-        
+
         public void Clean()
         {
             lock (_dicPools)

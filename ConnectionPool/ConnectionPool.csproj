@@ -42,9 +42,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Connection.cs" />
-    <Compile Include="DbConnectionFactory.cs" />
+    <Compile Include="DbConnectionFactory\OracleDbConnectionFactory.cs" />
     <Compile Include="Exceptions\ConnectionPoolException.cs" />
     <Compile Include="Exceptions\PoolLimitedException.cs" />
+    <Compile Include="IDbConnectionFactory.cs" />
     <Compile Include="Pool.cs" />
     <Compile Include="PoolManager.cs" />
     <Compile Include="PoolUtils.cs" />

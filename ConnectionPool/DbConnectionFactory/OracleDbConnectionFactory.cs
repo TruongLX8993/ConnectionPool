@@ -1,13 +1,12 @@
-﻿using System;
-using System.Data;
+﻿using System.Data;
 using ConnectionPool.Exceptions;
 using Oracle.DataAccess.Client;
 
-namespace ConnectionPool
+namespace ConnectionPool.DbConnectionFactory
 {
-    internal class DbConnectionFactory
+    public class OracleDbConnectionFactory :IDbConnectionFactory
     {
-        public static IDbConnection Create(string connectionString)
+        public IDbConnection CreateConnection(string connectionString)
         {
             var connection = OracleClientFactory.Instance.CreateConnection();
             if (connection == null) throw new ConnectionPoolException("Can not create new connection");
