@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConnectionPool", "TestConnectionPool\TestConnectionPool.csproj", "{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectionPool", "ConnectionPool\ConnectionPool.csproj", "{FB894635-C1A1-4362-AC48-27B1413D0A63}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectionPoolTest", "ConnectionPoolTest\ConnectionPoolTest.csproj", "{A6B55AA5-6529-4BAD-BDF6-58F18D265441}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB894635-C1A1-4362-AC48-27B1413D0A63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB894635-C1A1-4362-AC48-27B1413D0A63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB894635-C1A1-4362-AC48-27B1413D0A63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB894635-C1A1-4362-AC48-27B1413D0A63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6B55AA5-6529-4BAD-BDF6-58F18D265441}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6B55AA5-6529-4BAD-BDF6-58F18D265441}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6B55AA5-6529-4BAD-BDF6-58F18D265441}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6B55AA5-6529-4BAD-BDF6-58F18D265441}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
