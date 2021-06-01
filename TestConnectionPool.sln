@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConnectionPool", "TestConnectionPool\TestConnectionPool.csproj", "{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectionPoolDemo", "ConnectionPoolDemo\ConnectionPoolDemo.csproj", "{8F2F311B-A214-4C9B-A94B-23BAD36D67E3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectionPool", "ConnectionPool\ConnectionPool.csproj", "{FB894635-C1A1-4362-AC48-27B1413D0A63}"
 EndProject

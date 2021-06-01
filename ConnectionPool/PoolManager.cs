@@ -33,38 +33,30 @@ namespace ConnectionPool
         public Pool GetPool(string connectionString)
         {
             var key = PoolUtils.GetSourceName(connectionString);
-            lock (_dicPools)
-            {
-                if (_dicPools.ContainsKey(key)) return _dicPools[key];
-                var pool = new Pool(_dbConnectionFactory,
-                    connectionString,
-                    _maxPoolSize,
-                    _maxLifeTimeMin,
-                    _cleanPoolThreshold);
-                _dicPools.Add(key, pool);
-                return _dicPools[key];
-            }
+
+            if (_dicPools.ContainsKey(key)) return _dicPools[key];
+            var pool = new Pool(_dbConnectionFactory,
+                connectionString,
+                _maxPoolSize,
+                _maxLifeTimeMin,
+                _cleanPoolThreshold);
+            _dicPools.Add(key, pool);
+            return _dicPools[key];
         }
 
         public void Clean()
         {
-            lock (_dicPools)
+            foreach (var pool in _dicPools.Select(kp => kp.Value))
             {
-                foreach (var pool in _dicPools.Select(kp => kp.Value))
-                {
-                    pool.CleanExpiredConnection();
-                }
+                pool.CleanExpiredConnection();
             }
         }
 
         public void CleanAll()
         {
-            lock (_dicPools)
+            foreach (var pool in _dicPools.Select(kp => kp.Value))
             {
-                foreach (var pool in _dicPools.Select(kp => kp.Value))
-                {
-                    pool.CleanAll();
-                }
+                pool.CleanAll();
             }
         }
     }
