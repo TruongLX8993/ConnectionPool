@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Threading;
 
 namespace ConnectionPool
 {
@@ -32,8 +33,7 @@ namespace ConnectionPool
 
         public Pool GetPool(string connectionString)
         {
-            var key = PoolUtils.GetSourceName(connectionString);
-
+            var key = GetPoolKey(connectionString);
             if (_dicPools.ContainsKey(key)) return _dicPools[key];
             var pool = new Pool(_dbConnectionFactory,
                 connectionString,
@@ -42,6 +42,11 @@ namespace ConnectionPool
                 _cleanPoolThreshold);
             _dicPools.Add(key, pool);
             return _dicPools[key];
+        }
+
+        private string GetPoolKey(string connectionString)
+        {
+            return  PoolUtils.GetSourceName(connectionString);
         }
 
         public void Clean()

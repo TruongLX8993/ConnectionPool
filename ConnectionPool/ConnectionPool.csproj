@@ -55,6 +55,49 @@
     <None Include="App.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+copy $(TargetPath) E:\OneMES3.SYS\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.SYS\CoreDlls  
+copy $(TargetPath) E:\ONEMES3.HT\CoreDlls  
+copy $(TargetPath) E:\ONEMES3.HT\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.DM\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.DM\CoreDlls
+copy $(TargetPath) E:\OneMES3.TN\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.TN\CoreDlls
+copy $(TargetPath) E:\OneMES3.BN\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.BN\CoreDlls
+copy $(TargetPath) E:\OneMES3.HD\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.HD\CoreDlls
+copy $(TargetPath) E:\OneMES3.KB\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.KB\CoreDlls
+copy $(TargetPath) E:\OneMES3.VP\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.VP\CoreDlls
+copy $(TargetPath) E:\OneMES3.CDHA\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.CDHA\CoreDlls
+copy $(TargetPath) E:\OneMES3.YC\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.YC\CoreDlls
+copy $(TargetPath) E:\OneMES3.XN\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.XN\CoreDlls
+copy $(TargetPath) E:\OneMES3.WF\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.WF\CoreDlls
+copy $(TargetPath) E:\OneMES3.DP\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.DP\CoreDlls
+copy $(TargetPath) E:\OneMES3.DT\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.DT\CoreDlls
+copy $(TargetPath) E:\OneMES3.PTTT\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.PTTT\CoreDlls
+copy $(TargetPath) E:\OneMES3.KH\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.KH\CoreDlls
+copy $(TargetPath) E:\OneMES3.CLS\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.CLS\CoreDlls
+copy $(TargetPath) E:\OneMES3.BC\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.BC\CoreDlls
+copy $(TargetPath) E:\OneMES3.KCB\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.KCB\CoreDlls
+copy $(TargetPath) E:\OneMES3.CL\Runtime\web\bin
+copy $(TargetPath) E:\OneMES3.CL\CoreDlls</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
          Other similar extension points exist, see Microsoft.Common.targets.
     <Target Name="BeforeBuild">

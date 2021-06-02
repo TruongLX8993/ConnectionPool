@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using ConnectionPool.Exceptions;
 
 namespace ConnectionPool
@@ -16,6 +18,7 @@ namespace ConnectionPool
         private readonly int _cleanPoolThreshold;
         private readonly Queue<Connection> _freeConnections;
         private readonly IDictionary<IDbConnection, Connection> _mapConnections;
+        private DateTime _lastClean;
 
         public Pool(IDbConnectionFactory dbConnectionFactory,
             string dbConnectionString,
@@ -28,13 +31,14 @@ namespace ConnectionPool
             _maxPoolSize = maxPoolSize;
             _lifeTimeMinutes = lifeTimeMinutes;
             _freeConnections = new Queue<Connection>();
-            _mapConnections = new Dictionary<IDbConnection, Connection>();
+            _mapConnections = new ConcurrentDictionary<IDbConnection, Connection>();
             _cleanPoolThreshold = cleanPoolThreshold;
+            _lastClean = DateTime.Now;
         }
 
         public IDbConnection GetConnection()
         {
-                TryClean();
+            TryClean();
             var connection = GetConnectionFromQueue();
             if (connection == null)
             {
@@ -43,7 +47,7 @@ namespace ConnectionPool
             }
 
             connection.State = ConnectionState.Busy;
-            Debug.WriteLine($"GetConnection- Pool state: {GetPoolSize()}:{GetNumberConnectionFree()}");
+            // Debug.WriteLine($"GetConnection- Pool state: {GetPoolSize()}:{GetNumberConnectionFree()}");  
             return connection.DbConnection;
         }
 
@@ -86,13 +90,6 @@ namespace ConnectionPool
 
         public void ReleaseConnection(IDbConnection dbConnection)
         {
-            if (GetPoolSize() >= _cleanPoolThreshold)
-            {
-                dbConnection.Close();
-                _mapConnections.Remove(dbConnection);
-                return;
-            }
-
             if (!_mapConnections.ContainsKey(dbConnection))
             {
                 dbConnection.Close();
@@ -100,19 +97,29 @@ namespace ConnectionPool
             }
 
             var connection = _mapConnections[dbConnection];
+            if (GetPoolSize() >= _cleanPoolThreshold)
+            {
+                connection.State = ConnectionState.MarkClose;
+                return;
+            }
+
             connection.State = ConnectionState.Free;
             _freeConnections.Enqueue(connection);
-            Debug.WriteLine($"Release- Pool state: {GetPoolSize()}:{GetNumberConnectionFree()}");
         }
 
         private void TryClean()
         {
+            var dur = (DateTime.Now - _lastClean).TotalMinutes;
+            if (!(dur >= _lifeTimeMinutes) && GetPoolSize() <= _cleanPoolThreshold) return;
             CleanExpiredConnection();
+            _lastClean = DateTime.Now;
         }
 
         public void CleanExpiredConnection()
         {
-            Clean(con => con.IsExpired());
+            Clean(con => con != null && (con.IsExpired() ||
+                                         con.State == ConnectionState.MarkClose ||
+                                         con.State == ConnectionState.Closed));
         }
 
         public void CleanAll()
@@ -122,27 +129,27 @@ namespace ConnectionPool
 
         private void Clean(Func<Connection, bool> cleanCondition)
         {
-            IList<KeyValuePair<IDbConnection, Connection>> expiredConnectionKeyPairs;
-            expiredConnectionKeyPairs = _mapConnections.Where(keyPair => cleanCondition(keyPair.Value))
+            IList<Connection> expiredConnections = _mapConnections.Values
                 .ToList();
-            foreach (var expiredConnectionKeyPair in expiredConnectionKeyPairs)
+            IList<Connection> removedConnection = new List<Connection>();
+
+            expiredConnections = expiredConnections.Where(cleanCondition)
+                .ToList();
+
+            foreach (var connection in expiredConnections)
             {
-                cleanCondition(expiredConnectionKeyPair.Value);
-                expiredConnectionKeyPair.Value.State = ConnectionState.Closed;
-                _mapConnections.Remove(expiredConnectionKeyPair.Key);
+                if (!_mapConnections.ContainsKey(connection.DbConnection)) continue;
+                connection.State = ConnectionState.Closed;
+                removedConnection.Add(connection);
+                _mapConnections.Remove(connection.DbConnection);
             }
 
-            foreach (var expiredConnectionKeyPair in expiredConnectionKeyPairs)
+            foreach (var connection in removedConnection)
             {
-                try
-                {
-                    expiredConnectionKeyPair.Value.Close();
-                }
-                catch (Exception)
-                {
-                    // ignored
-                }
+                connection.DbConnection.Close();
             }
+
+            Debug.WriteLine($"Pool-clean:{removedConnection.Count}-{GetNumberConnectionFree()}-{GetPoolSize()}");
         }
     }
 }

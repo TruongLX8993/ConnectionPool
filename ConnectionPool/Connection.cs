@@ -8,6 +8,7 @@ namespace ConnectionPool
     {
         Free,
         Busy,
+        MarkClose,
         Closed,
     }
 
