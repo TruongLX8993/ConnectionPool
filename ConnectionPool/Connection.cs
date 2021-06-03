@@ -7,8 +7,8 @@ namespace ConnectionPool
     public enum ConnectionState
     {
         Free,
+        Active,
         Busy,
-        MarkClose,
         Closed,
     }
 
@@ -18,6 +18,7 @@ namespace ConnectionPool
         {
             DbConnection = dbConnection;
             _lifeTimeSeconds = lifeTimeSeconds;
+            State = ConnectionState.Free;
         }
 
         private DateTime _lastUpdateTime;
@@ -28,7 +29,7 @@ namespace ConnectionPool
         public ConnectionState State
         {
             get { return _state; }
-            set
+            private set
             {
                 _lastUpdateTime = DateTime.Now;
                 _state = value;
@@ -44,13 +45,14 @@ namespace ConnectionPool
 
         public void Close()
         {
-            if (_state != ConnectionState.Closed)
-            {
-                throw new ConnectionPoolException("Pool is set closed state before close");
-            }
-
+            State = ConnectionState.Closed;
             DbConnection.Close();
             DbConnection.Dispose();
+        }
+
+        public void Active()
+        {
+            State = ConnectionState.Active;
         }
 
         public bool IsExecuting()
@@ -63,6 +65,30 @@ namespace ConnectionPool
         {
             return IsExpired() && _state == ConnectionState.Busy &&
                    DbConnection.State == System.Data.ConnectionState.Open;
+        }
+
+        public bool IsFree()
+        {
+            return _state == ConnectionState.Free && DbConnection.State == System.Data.ConnectionState.Open;
+        }
+
+        public IDbConnection Open()
+        {
+            State = ConnectionState.Busy;
+            if (DbConnection.State != System.Data.ConnectionState.Open)
+                DbConnection.Open();
+            return DbConnection;
+        }
+
+        public bool IsClosed()
+        {
+            return _state == ConnectionState.Closed && DbConnection != null &&
+                   DbConnection.State == System.Data.ConnectionState.Closed;
+        }
+
+        public void Release()
+        {
+            State = ConnectionState.Free;
         }
     }
 }

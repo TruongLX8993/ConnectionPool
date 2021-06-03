@@ -23,11 +23,11 @@ namespace ConnectionPoolTest
         public void TestOpenAndRelease()
         {
             var pool = _poolManager.GetPool(Constance.ConnectionString);
-            var connection = pool.GetConnection();
-            var trans = connection.BeginTransaction();
+            var dbConnection = pool.GetConnection();
+            var trans = dbConnection.BeginTransaction();
             pool = _poolManager.GetPool(trans.Connection.ConnectionString);
-            pool.ReleaseConnection(connection);
-            Assert.True(connection != null && connection.State == ConnectionState.Open);
+            pool.ReleaseConnection(dbConnection);
+            Assert.True(dbConnection != null && dbConnection.State == ConnectionState.Open);
         }
 
         public void LimitPool()

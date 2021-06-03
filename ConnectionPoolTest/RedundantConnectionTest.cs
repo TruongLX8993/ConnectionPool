@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace ConnectionPoolTest
 {
-    [TestFixture(20)]
+    [TestFixture(10,10)]
     public class RedundantConnectionTest
     {
         private readonly int _numberConnection;

@@ -48,6 +48,7 @@
     <Compile Include="IDbConnectionFactory.cs" />
     <Compile Include="Pool.cs" />
     <Compile Include="PoolManager.cs" />
+    <Compile Include="PoolStorage.cs" />
     <Compile Include="PoolUtils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
