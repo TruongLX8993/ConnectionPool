@@ -48,8 +48,21 @@ namespace ConnectionPool
             {
                 throw new ConnectionPoolException("Pool is set closed state before close");
             }
+
             DbConnection.Close();
             DbConnection.Dispose();
+        }
+
+        public bool IsExecuting()
+        {
+            return _state == ConnectionState.Busy &&
+                   DbConnection.State == System.Data.ConnectionState.Executing;
+        }
+
+        public bool MissRelease()
+        {
+            return IsExpired() && _state == ConnectionState.Busy &&
+                   DbConnection.State == System.Data.ConnectionState.Open;
         }
     }
 }
