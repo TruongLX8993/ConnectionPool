@@ -14,14 +14,14 @@ namespace ConnectionPool
 
     public class Connection
     {
-        public Connection(IDbConnection dbConnection, int lifeTimeMinutes)
+        public Connection(IDbConnection dbConnection, int lifeTimeSeconds)
         {
             DbConnection = dbConnection;
-            _lifeTimeMinutes = lifeTimeMinutes;
+            _lifeTimeSeconds = lifeTimeSeconds;
         }
 
         private DateTime _lastUpdateTime;
-        private int _lifeTimeMinutes;
+        private int _lifeTimeSeconds;
 
         private ConnectionState _state;
 
@@ -39,7 +39,7 @@ namespace ConnectionPool
 
         public bool IsExpired()
         {
-            return _lifeTimeMinutes > 0 && DateTime.Now.Subtract(_lastUpdateTime).TotalMinutes > _lifeTimeMinutes;
+            return _lifeTimeSeconds > 0 && DateTime.Now.Subtract(_lastUpdateTime).TotalSeconds > _lifeTimeSeconds;
         }
 
         public void Close()

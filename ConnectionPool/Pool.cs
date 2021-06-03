@@ -14,7 +14,7 @@ namespace ConnectionPool
         private readonly IDbConnectionFactory _dbConnectionFactory;
         private readonly string _dbConnectionString;
         private readonly int _maxPoolSize;
-        private readonly int _lifeTimeMinutes;
+        private readonly int _lifeTimeSeconds;
         private readonly int _cleanPoolThreshold;
         private readonly Queue<Connection> _freeConnections;
         private readonly IDictionary<IDbConnection, Connection> _mapConnections;
@@ -23,13 +23,13 @@ namespace ConnectionPool
         public Pool(IDbConnectionFactory dbConnectionFactory,
             string dbConnectionString,
             int maxPoolSize,
-            int lifeTimeMinutes,
+            int lifeTimeSeconds,
             int cleanPoolThreshold)
         {
             _dbConnectionFactory = dbConnectionFactory;
             _dbConnectionString = dbConnectionString;
             _maxPoolSize = maxPoolSize;
-            _lifeTimeMinutes = lifeTimeMinutes;
+            _lifeTimeSeconds = lifeTimeSeconds;
             _freeConnections = new Queue<Connection>();
             _mapConnections = new ConcurrentDictionary<IDbConnection, Connection>();
             _cleanPoolThreshold = cleanPoolThreshold;
@@ -56,7 +56,7 @@ namespace ConnectionPool
             while (_freeConnections.Count != 0)
             {
                 var connection = _freeConnections.Dequeue();
-                if (connection.State != ConnectionState.Free) continue;
+                if (connection == null || connection.State != ConnectionState.Free) continue;
                 return connection;
             }
 
@@ -72,7 +72,7 @@ namespace ConnectionPool
             }
 
             var dbConnection = _dbConnectionFactory.CreateConnection(_dbConnectionString);
-            var newConnection = new Connection(dbConnection, _lifeTimeMinutes) {State = ConnectionState.Free};
+            var newConnection = new Connection(dbConnection, _lifeTimeSeconds) {State = ConnectionState.Free};
             _mapConnections.Add(dbConnection, newConnection);
             dbConnection.Open();
             _freeConnections.Enqueue(newConnection);
@@ -97,20 +97,17 @@ namespace ConnectionPool
             }
 
             var connection = _mapConnections[dbConnection];
-            if (GetPoolSize() >= _cleanPoolThreshold)
+            if (connection != null)
             {
-                connection.State = ConnectionState.MarkClose;
-                return;
+                connection.State = ConnectionState.Free;
+                _freeConnections.Enqueue(connection);
             }
-
-            connection.State = ConnectionState.Free;
-            _freeConnections.Enqueue(connection);
         }
 
         private void TryClean()
         {
-            var dur = (DateTime.Now - _lastClean).TotalMinutes;
-            if (!(dur >= _lifeTimeMinutes) && GetPoolSize() <= _cleanPoolThreshold) return;
+            var dur = (DateTime.Now - _lastClean).TotalSeconds;
+            if (!(dur >= _lifeTimeSeconds) && GetPoolSize() <= _cleanPoolThreshold) return;
             CleanExpiredConnection();
             _lastClean = DateTime.Now;
         }
@@ -119,7 +116,7 @@ namespace ConnectionPool
         {
             Clean(con => con != null && (con.IsExpired() ||
                                          con.State == ConnectionState.MarkClose ||
-                                         con.State == ConnectionState.Closed));
+                                         con.State == ConnectionState.Closed), true);
         }
 
         public void CleanAll()
@@ -127,7 +124,7 @@ namespace ConnectionPool
             Clean(con => true);
         }
 
-        private void Clean(Func<Connection, bool> cleanCondition)
+        private void Clean(Func<Connection, bool> cleanCondition, bool reuseConnection = false)
         {
             IList<Connection> expiredConnections = _mapConnections.Values
                 .ToList();
@@ -138,10 +135,28 @@ namespace ConnectionPool
 
             foreach (var connection in expiredConnections)
             {
-                if (!_mapConnections.ContainsKey(connection.DbConnection)) continue;
+                if (connection.State == ConnectionState.Busy)
+                {
+                    if (reuseConnection && connection.DbConnection.State == System.Data.ConnectionState.Open)
+                    {
+                        connection.State = ConnectionState.Free;
+                        _freeConnections.Enqueue(connection);
+                        continue;
+                    }
+                }
+
+                if (connection.State == ConnectionState.Busy &&
+                    connection.DbConnection.State == System.Data.ConnectionState.Executing)
+                {
+                    continue;
+                }
+
                 connection.State = ConnectionState.Closed;
                 removedConnection.Add(connection);
-                _mapConnections.Remove(connection.DbConnection);
+                if (_mapConnections.ContainsKey(connection.DbConnection))
+                {
+                    _mapConnections.Remove(connection.DbConnection);
+                }
             }
 
             foreach (var connection in removedConnection)

@@ -10,20 +10,20 @@ namespace ConnectionPool
     {
         private readonly IDictionary<string, Pool> _dicPools;
         private readonly int _maxPoolSize;
-        private readonly int _maxLifeTimeMin;
+        private readonly int _maxLifeTimeSeconds;
         private readonly int _cleanPoolThreshold;
         private readonly IDbConnectionFactory _dbConnectionFactory;
 
         public PoolManager(
             IDbConnectionFactory dbConnectionFactory,
             int maxPoolSize,
-            int lifeTimeMin,
+            int lifeTimeSeconds,
             int cleanPoolThreshold)
         {
             _dbConnectionFactory = dbConnectionFactory;
             _dicPools = new Dictionary<string, Pool>();
             _maxPoolSize = maxPoolSize;
-            _maxLifeTimeMin = lifeTimeMin;
+            _maxLifeTimeSeconds = lifeTimeSeconds;
             _cleanPoolThreshold = cleanPoolThreshold;
             if (_cleanPoolThreshold > _maxPoolSize)
             {
@@ -38,7 +38,7 @@ namespace ConnectionPool
             var pool = new Pool(_dbConnectionFactory,
                 connectionString,
                 _maxPoolSize,
-                _maxLifeTimeMin,
+                _maxLifeTimeSeconds,
                 _cleanPoolThreshold);
             _dicPools.Add(key, pool);
             return _dicPools[key];
