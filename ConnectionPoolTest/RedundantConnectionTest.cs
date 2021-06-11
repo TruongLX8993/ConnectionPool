@@ -37,6 +37,7 @@ namespace ConnectionPoolTest
             for (var i = 0; i < _numberConnection; i++)
             {
                 _dbConnection = _pool.GetConnection();
+                _dbConnection.BeginTransaction();
             }
         }
 

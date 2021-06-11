@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using ConnectionPool.Exceptions;
+using ConnectionPool.Extensions;
 
 namespace ConnectionPool
 {
@@ -15,6 +14,7 @@ namespace ConnectionPool
         private readonly PoolStorage _poolStorage;
         private readonly IDbConnectionFactory _dbConnectionFactory;
         private readonly string _dbConnectionString;
+        private IConnectionListener _connectionListener;
 
         public Pool(IDbConnectionFactory dbConnectionFactory,
             string dbConnectionString,
@@ -29,19 +29,9 @@ namespace ConnectionPool
             _poolStorage = new PoolStorage();
             _cleanPoolThreshold = cleanPoolThreshold;
             _lastClean = DateTime.Now;
+            _connectionListener = new ConnectionListener(_poolStorage);
         }
 
-
-        private Connection CreateNew()
-        {
-            if (_maxPoolSize <= _poolStorage.GetPoolSize())
-            {
-                throw new PoolLimitedException();
-            }
-
-            var dbConnection = _dbConnectionFactory.CreateConnection(_dbConnectionString);
-            return new Connection(dbConnection, _lifeTimeSeconds);
-        }
 
         public IDbConnection GetConnection()
         {
@@ -55,7 +45,7 @@ namespace ConnectionPool
 
         public int GetPoolSize()
         {
-            return _poolStorage.GetPoolSize();
+            return _poolStorage.GetSize();
         }
 
         public int GetNumberConnectionFree()
@@ -69,58 +59,31 @@ namespace ConnectionPool
             if (connection != null)
             {
                 connection.Release();
-                _poolStorage.ReturnConnection(connection);
+                _poolStorage.Return(connection);
             }
             else
             {
-                dbConnection.Close();
+                dbConnection.CloseAndDispose();
             }
         }
 
 
         public void CleanExpiredConnection()
         {
-            Clean(con => con != null && (con.IsExpired() ||
-                                         con.State == ConnectionState.Closed), true);
+            _poolStorage.Clean(con =>
+            {
+                var state = con.State;
+                return state == ConnectionState.Closed ||
+                       state == ConnectionState.Expired ||
+                       state == ConnectionState.MissRelease;
+            }, true);
+            _lastClean = DateTime.Now;
         }
 
         public void CleanAll()
         {
-            Clean(con => true);
-        }
-
-        private void Clean(Func<Connection, bool> cleanCondition, bool reuseConnection = false)
-        {
-            var removedConnections = new List<Connection>();
-            var reuseConnections = new List<Connection>();
-            var expiredConnections = _poolStorage.GetConnections(cleanCondition);
-
-            foreach (var connection in expiredConnections)
-            {
-                if (reuseConnection && connection.MissRelease())
-                {
-                    reuseConnections.Add(connection);
-                    continue;
-                }
-
-                if (connection.IsExecuting())
-                    continue;
-                removedConnections.Add(connection);
-            }
-
-            foreach (var connection in removedConnections)
-            {
-                connection.Close();
-                _poolStorage.RemoveConnection(connection);
-            }
-
-            foreach (var connection in reuseConnections)
-            {
-                connection.Release();
-                _poolStorage.ReturnConnection(connection);
-            }
-
-            Debug.WriteLine($"Pool-clean:{removedConnections.Count}-{GetNumberConnectionFree()}-{GetPoolSize()}");
+            _poolStorage.Clean(con => true);
+            _lastClean = DateTime.Now;
         }
 
         private void TryClean()
@@ -128,7 +91,20 @@ namespace ConnectionPool
             var dur = (DateTime.Now - _lastClean).TotalSeconds;
             if (!(dur >= _lifeTimeSeconds) && GetPoolSize() <= _cleanPoolThreshold) return;
             CleanExpiredConnection();
-            _lastClean = DateTime.Now;
+        }
+
+        private Connection CreateNew()
+        {
+            if (_maxPoolSize <= _poolStorage.GetSize())
+            {
+                throw new PoolLimitedException();
+            }
+
+            var dbConnection = _dbConnectionFactory.CreateConnection(_dbConnectionString);
+            return new Connection(dbConnection,
+                _connectionListener,
+                30,
+                _lifeTimeSeconds);
         }
     }
 }

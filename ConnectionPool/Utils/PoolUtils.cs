@@ -2,7 +2,7 @@
 
 using System.Linq;
 
-namespace ConnectionPool
+namespace ConnectionPool.Utils
 {
     internal class PoolUtils
     {

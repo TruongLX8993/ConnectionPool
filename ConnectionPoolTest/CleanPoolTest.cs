@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace ConnectionPoolTest
 {
-    [TestFixture(20, 1,6, 5)]
+    [TestFixture(20, 1, 6, 5)]
     public class CleanPoolTest
     {
         private readonly int _maxConnectionPool;
@@ -16,7 +16,7 @@ namespace ConnectionPoolTest
         private Pool _pool;
 
 
-        public CleanPoolTest(int maxConnectionPool, int connectionLifeTime,int numberConnection, int cleanThreshold)
+        public CleanPoolTest(int maxConnectionPool, int connectionLifeTime, int numberConnection, int cleanThreshold)
         {
             _maxConnectionPool = maxConnectionPool;
             _connectionLifeTime = connectionLifeTime;
@@ -43,7 +43,6 @@ namespace ConnectionPoolTest
                 _pool.GetConnection();
             }
 
-            Thread.Sleep(30000);
             var poolSize = _pool.GetPoolSize();
             if (poolSize != _numberConnection)
             {
@@ -51,8 +50,6 @@ namespace ConnectionPoolTest
                     $"Number connection in the pool not correct.Target is {_numberConnection} per {poolSize} ");
                 return;
             }
-
-            Thread.Sleep(40000);
             _pool.GetConnection();
             poolSize = _pool.GetPoolSize();
             if (poolSize != 1)

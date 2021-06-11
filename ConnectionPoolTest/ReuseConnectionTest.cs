@@ -28,10 +28,7 @@ namespace ConnectionPoolTest
         [OneTimeSetUp]
         public void SetUp()
         {
-            var poolManager = new PoolManager(new OracleDbConnectionFactory(),
-                10,
-                1,
-                5);
+            var poolManager = new PoolManager(new OracleDbConnectionFactory());
             _pool = poolManager.GetPool(Constance.ConnectionString);
         }
 
@@ -52,6 +49,7 @@ namespace ConnectionPoolTest
                     $"Number connection in the pool not correct.Target is {_numberConnection} per {poolSize} ");
                 return;
             }
+
             _pool.ReleaseConnection(connection);
             _pool.GetConnection();
             poolSize = _pool.GetPoolSize();

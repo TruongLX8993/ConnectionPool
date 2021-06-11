@@ -25,13 +25,10 @@ namespace ConnectionPool
                 while (_freeConnections.Count != 0)
                 {
                     var con = _freeConnections.Dequeue();
-                    if (con.IsFree())
-                    {
-                        con.Active();
-                        return con;
-                    }
+                    if (con.State != ConnectionState.Free) continue;
+                    con.Active();
+                    return con;
                 }
-
                 return null;
             }
         }
@@ -42,42 +39,40 @@ namespace ConnectionPool
             {
                 if (enqueue)
                     _freeConnections.Enqueue(connection);
-                if (!_mapConnections.ContainsKey(connection.DbConnection))
-                {
-                    _mapConnections.Add(connection.DbConnection, connection);
-                }
+
+                if (!_mapConnections.ContainsKey(connection.DatabaseConnection))
+                    _mapConnections.Add(connection.DatabaseConnection, connection);
+
             }
         }
 
-        public void ReturnConnection(Connection connection)
+        public void Return(Connection connection)
         {
             lock (_lock)
             {
-                if (connection.IsFree())
-                {
+                if (connection == null)
+                    return;
+
+                if (connection.State == ConnectionState.Free)
                     _freeConnections.Enqueue(connection);
-                }
-
-                if (!_mapConnections.ContainsKey(connection.DbConnection))
-                {
-                    _mapConnections.Add(connection.DbConnection, connection);
-                }
+                
+                if (!_mapConnections.ContainsKey(connection.DatabaseConnection))
+                    _mapConnections.Add(connection.DatabaseConnection, connection);
             }
         }
 
-        public void RemoveConnection(Connection connection)
+        public void Remove(Connection connection)
         {
             lock (_lock)
             {
-                if (!connection.IsClosed()) return;
-                if (_mapConnections.ContainsKey(connection.DbConnection))
+                if (_mapConnections.ContainsKey(connection.DatabaseConnection))
                 {
-                    _mapConnections.Remove(connection.DbConnection);
+                    _mapConnections.Remove(connection.DatabaseConnection);
                 }
             }
         }
 
-        public int GetPoolSize()
+        public int GetSize()
         {
             lock (_lock)
             {
@@ -98,7 +93,7 @@ namespace ConnectionPool
             }
         }
 
-        public IList<Connection> GetConnections(Func<Connection, bool> condition)
+        private IList<Connection> GetConnections(Func<Connection, bool> condition)
         {
             lock (_lock)
             {
@@ -106,9 +101,36 @@ namespace ConnectionPool
             }
         }
 
-        private void DebugState(string method)
+        public void Clean(Func<Connection, bool> cleanCondition, bool reuseConnection = false)
         {
-            Debug.WriteLine($"{method}:{GetFreeConnection()}-{GetPoolSize()}");
+            var removedConnections = new List<Connection>();
+            var reuseConnections = new List<Connection>();
+            var expiredConnections = GetConnections(cleanCondition);
+
+            foreach (var connection in expiredConnections)
+            {
+                if (reuseConnection && connection.State == ConnectionState.MissRelease)
+                {
+                    reuseConnections.Add(connection);
+                    continue;
+                }
+
+                removedConnections.Add(connection);
+            }
+
+            foreach (var connection in removedConnections.Where(connection => connection.Close()))
+            {
+                Remove(connection);
+            }
+
+            foreach (var connection in reuseConnections.Where(connection => connection.Release()))
+            {
+                Return(connection);
+            }
+        }
+
+        public void MoveToFreeQueue(Connection con)
+        {
         }
     }
 }

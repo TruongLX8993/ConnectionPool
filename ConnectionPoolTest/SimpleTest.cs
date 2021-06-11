@@ -13,10 +13,7 @@ namespace ConnectionPoolTest
         [OneTimeSetUp]
         public void SetUp()
         {
-            _poolManager = new PoolManager(new OracleDbConnectionFactory(),
-                10,
-                1,
-                5);
+            _poolManager = new PoolManager(new OracleDbConnectionFactory());
         }
 
         [Test]
