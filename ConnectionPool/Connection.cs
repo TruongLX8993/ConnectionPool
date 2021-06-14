@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Odbc;
+using System.Linq;
 using ConnectionPool.Exceptions;
 using ConnectionPool.Extensions;
 using ConnectionPool.Utils;
@@ -12,8 +14,9 @@ namespace ConnectionPool
         Free,
         Active,
         Busy,
+        Executing,
         MissRelease,
-        ReadyToClose,
+        Broken,
         Closed,
         Expired,
     }
@@ -23,21 +26,20 @@ namespace ConnectionPool
     {
         private DateTime _lastUpdateTime;
         private readonly int _lifeTimeSeconds;
-        private readonly int _timeoutReturnSeconds;
+        private readonly int _maxBusySeconds;
         private readonly object _lockState = new object();
         private ConnectionState _state;
-        private readonly IConnectionListener _listener;
         private readonly IDbConnection _dbConnection;
+        private bool _openedFlag;
+        private ConnectionState? _prevState;
 
         public Connection(IDbConnection dbConnection,
-            IConnectionListener listener,
             int lifeTimeSeconds,
-            int timeoutReturnSeconds)
+            int maxBusySeconds)
         {
             State = ConnectionState.Free;
-            _listener = listener;
             _lifeTimeSeconds = lifeTimeSeconds;
-            _timeoutReturnSeconds = timeoutReturnSeconds;
+            _maxBusySeconds = maxBusySeconds;
             _dbConnection = dbConnection;
         }
 
@@ -61,36 +63,21 @@ namespace ConnectionPool
                 lock (_lockState)
                 {
                     _lastUpdateTime = DateTime.Now;
+                    if (value == _prevState) return;
+                    _prevState = _state;
                     _state = value;
                 }
             }
         }
 
-        public bool Close()
-        {
-            lock (_lockState)
-            {
-                if (_dbConnection.State == System.Data.ConnectionState.Executing)
-                {
-                    return false;
-                }
-
-                if (!_dbConnection.CloseAndDispose()) return true;
-                State = ConnectionState.Closed;
-                _listener.OnClose(this);
-            }
-
-            return true;
-        }
 
         public bool Active()
         {
             lock (_lockState)
             {
-                if (!_dbConnection.HasConnect()) return false;
-                if (_state != ConnectionState.Free) return false;
+                var currentState = State;
+                if (currentState != ConnectionState.Free) return false;
                 State = ConnectionState.Active;
-                _listener.OnActive(this);
                 return true;
             }
         }
@@ -100,37 +87,77 @@ namespace ConnectionPool
         {
             lock (_lockState)
             {
-                State = ConnectionState.Busy;
+                var currentState = State;
+                if (_state != ConnectionState.Active)
+                    throw new StateException(currentState, ConnectionState.Active);
                 if (_dbConnection.State == System.Data.ConnectionState.Closed)
                     _dbConnection.Open();
-                _listener.OnClose(this);
+                State = ConnectionState.Busy;
+                _openedFlag = true;
                 return _dbConnection;
             }
         }
 
-
-        /// <summary>
-        /// State switch to free
-        /// </summary>
-        /// <returns></returns>
         public bool Release()
         {
             lock (_lockState)
             {
-                if (_dbConnection.State != System.Data.ConnectionState.Open) return false;
+                var currentState = State;
+                if (currentState == ConnectionState.Closed ||
+                    currentState == ConnectionState.Broken ||
+                    currentState == ConnectionState.Executing)
+                    return false;
                 State = ConnectionState.Free;
-                _listener.OnRelease(this);
                 return true;
             }
+        }
+
+        public bool Close()
+        {
+            lock (_lockState)
+            {
+                var currentState = State;
+                if (currentState == ConnectionState.Closed)
+                    return true;
+                
+                if (CanCloseDbConnection(currentState, _prevState))
+                {
+                    if (!_dbConnection.CloseAndDispose())
+                        return false;
+                }
+
+                State = ConnectionState.Closed;
+                return true;
+            }
+        }
+
+        private static bool CanCloseDbConnection(ConnectionState currentState, ConnectionState? prevState)
+        {
+            if (currentState == ConnectionState.Free || currentState == ConnectionState.Broken)
+                return true;
+            if (currentState == ConnectionState.Expired)
+            {
+                var prevStates = new List<ConnectionState> {ConnectionState.Broken, ConnectionState.Free};
+                if (prevState == null || prevStates.Contains(prevState.Value))
+                    return true;
+            }
+
+            return false;
         }
 
         private void UpdateState()
         {
             lock (_lockState)
             {
-                if (IsClosed())
+                if (_openedFlag && !_dbConnection.HasConnect())
                 {
-                    State = ConnectionState.Closed;
+                    State = ConnectionState.Broken;
+                    return;
+                }
+
+                if (_dbConnection.IsExecuting())
+                {
+                    State = ConnectionState.Executing;
                     return;
                 }
 
@@ -139,41 +166,22 @@ namespace ConnectionPool
                     State = ConnectionState.Expired;
                 }
 
-                if (IsTimeoutReturnPool())
+                if (IsBusyTimeout())
                 {
                     State = ConnectionState.MissRelease;
                 }
             }
         }
 
-        public bool IsExpired()
+        private bool IsExpired()
         {
             return _lifeTimeSeconds > 0 && DateTime.Now.Subtract(_lastUpdateTime).TotalSeconds > _lifeTimeSeconds;
         }
 
-        public bool IsTimeoutReturnPool()
+        private bool IsBusyTimeout()
         {
-            return _timeoutReturnSeconds > 0 &&
-                   DateTime.Now.Subtract(_lastUpdateTime).TotalSeconds > _timeoutReturnSeconds;
-        }
-
-        private bool IsMissRelease()
-        {
-            return TimeoutUtil.IsTimeout(_lastUpdateTime, DateTime.Now, _timeoutReturnSeconds) &&
-                   _state == ConnectionState.Busy &&
-                   _dbConnection.State == System.Data.ConnectionState.Open;
-        }
-
-        public bool IsFree()
-        {
-            return _state == ConnectionState.Free &&
-                   _dbConnection.State == System.Data.ConnectionState.Open;
-        }
-
-        public bool IsClosed()
-        {
-            return _state == ConnectionState.Closed || (_dbConnection != null &&
-                                                        _dbConnection.State == System.Data.ConnectionState.Closed);
+            return _maxBusySeconds > 0 &&
+                   DateTime.Now.Subtract(_lastUpdateTime).TotalSeconds > _maxBusySeconds;
         }
     }
 }

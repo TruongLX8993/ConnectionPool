@@ -11,6 +11,13 @@ namespace ConnectionPool.Extensions
                    dbConnection.State != System.Data.ConnectionState.Broken;
         }
 
+        public static bool IsExecuting(this IDbConnection dbConnection)
+        {
+            return dbConnection.State == System.Data.ConnectionState.Executing ||
+                   dbConnection.State == System.Data.ConnectionState.Fetching;
+        }
+
+
         public static bool CloseAndDispose(this IDbConnection dbConnection)
         {
             try
@@ -22,6 +29,7 @@ namespace ConnectionPool.Extensions
             {
                 // ignored
             }
+
             return dbConnection.State == System.Data.ConnectionState.Closed;
         }
     }

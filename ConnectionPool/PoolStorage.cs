@@ -17,20 +17,36 @@ namespace ConnectionPool
         private readonly Queue<Connection> _freeConnections;
         private readonly object _lock = new object();
         private readonly IDictionary<IDbConnection, Connection> _mapConnections;
+        private int _globalCounter = 0;
+        private int _recycleCounter = 0;
 
         public Connection GetFreeConnection()
         {
             lock (_lock)
             {
+                _globalCounter++;
                 while (_freeConnections.Count != 0)
                 {
-                    var con = _freeConnections.Dequeue();
+                    var con = GetFromQueue();
                     if (con.State != ConnectionState.Free) continue;
                     con.Active();
+                    _recycleCounter++;
+                    Debug.WriteLine($"{_recycleCounter}:{_globalCounter}");
                     return con;
                 }
+
+                Debug.WriteLine($"{_recycleCounter}:{_globalCounter}");
                 return null;
             }
+        }
+
+        private Connection GetFromQueue()
+        {
+            var con = _freeConnections.Dequeue();
+            if (con == null) return null;
+            if (_mapConnections.ContainsKey(con.DatabaseConnection))
+                _mapConnections.Remove(con.DatabaseConnection);
+            return con;
         }
 
         public void AddNewConnection(Connection connection, bool enqueue = false)
@@ -42,7 +58,6 @@ namespace ConnectionPool
 
                 if (!_mapConnections.ContainsKey(connection.DatabaseConnection))
                     _mapConnections.Add(connection.DatabaseConnection, connection);
-
             }
         }
 
@@ -50,14 +65,11 @@ namespace ConnectionPool
         {
             lock (_lock)
             {
-                if (connection == null)
-                    return;
-
-                if (connection.State == ConnectionState.Free)
-                    _freeConnections.Enqueue(connection);
-                
-                if (!_mapConnections.ContainsKey(connection.DatabaseConnection))
-                    _mapConnections.Add(connection.DatabaseConnection, connection);
+                var currentState = connection.State;
+                if (currentState == ConnectionState.Free)
+                {
+                    AddNewConnection(connection, true);
+                }
             }
         }
 
@@ -74,10 +86,7 @@ namespace ConnectionPool
 
         public int GetSize()
         {
-            lock (_lock)
-            {
-                return _mapConnections.Count;
-            }
+            return _mapConnections.Count;
         }
 
         public int GetNumberConnectionFree()
@@ -93,7 +102,7 @@ namespace ConnectionPool
             }
         }
 
-        private IList<Connection> GetConnections(Func<Connection, bool> condition)
+        private IEnumerable<Connection> GetConnections(Func<Connection, bool> condition)
         {
             lock (_lock)
             {
@@ -104,33 +113,14 @@ namespace ConnectionPool
         public void Clean(Func<Connection, bool> cleanCondition, bool reuseConnection = false)
         {
             var removedConnections = new List<Connection>();
-            var reuseConnections = new List<Connection>();
-            var expiredConnections = GetConnections(cleanCondition);
-
-            foreach (var connection in expiredConnections)
+            lock (_lock)
             {
-                if (reuseConnection && connection.State == ConnectionState.MissRelease)
-                {
-                    reuseConnections.Add(connection);
-                    continue;
-                }
+                var expiredConnections = GetConnections(cleanCondition);
+                removedConnections.AddRange(expiredConnections);
 
-                removedConnections.Add(connection);
+                foreach (var connection in removedConnections.Where(connection => connection.Close()))
+                    Remove(connection);
             }
-
-            foreach (var connection in removedConnections.Where(connection => connection.Close()))
-            {
-                Remove(connection);
-            }
-
-            foreach (var connection in reuseConnections.Where(connection => connection.Release()))
-            {
-                Return(connection);
-            }
-        }
-
-        public void MoveToFreeQueue(Connection con)
-        {
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -11,37 +12,39 @@ namespace ConnectionPool
 {
     public class PoolManager
     {
-        private const int DefaultPoolSize = 2000;
-        private const int DefaultLifeTime = 40;
-        private const int DefaultCleanPool = 300;
-
+        private const int DefaultLifeTime = 60;
+        private const int DefaultBusynessSeconds = 40;
+        private const int DefaultPoolSizeThreshold = 100;
+        private const int DefaultCleanInterval = 120;
 
         private readonly IDictionary<string, Pool> _dicPools;
-        private readonly int _maxPoolSize;
-        private readonly int _maxLifeTimeSeconds;
-        private readonly int _cleanPoolThreshold;
+        private readonly int _lifeTimeSeconds;
+        private readonly int _busynessSeconds;
+        private readonly int _poolSizeThreshold;
         private readonly IDbConnectionFactory _dbConnectionFactory;
+        private readonly ConnectionCleaner _cleaner;
+
 
         public PoolManager(
             IDbConnectionFactory dbConnectionFactory,
-            int maxPoolSize,
             int lifeTimeSeconds,
-            int cleanPoolThreshold)
+            int busynessSeconds,
+            int poolSizeThreshold)
         {
             _dbConnectionFactory = dbConnectionFactory;
             _dicPools = new Dictionary<string, Pool>();
-            _maxPoolSize = maxPoolSize;
-            _maxLifeTimeSeconds = lifeTimeSeconds;
-            _cleanPoolThreshold = cleanPoolThreshold;
-            if (_cleanPoolThreshold > _maxPoolSize)
-            {
-                throw new ArgumentException("Max-pool-size cannot be less clean-threshold ");
-            }
+            _lifeTimeSeconds = lifeTimeSeconds;
+            _busynessSeconds = busynessSeconds;
+            _poolSizeThreshold = poolSizeThreshold;
+            _cleaner = new ConnectionCleaner(DefaultCleanInterval);
+            _cleaner.Start();
         }
 
         public PoolManager(IDbConnectionFactory dbConnectionFactory)
         {
             _dbConnectionFactory = dbConnectionFactory;
+            _cleaner = new ConnectionCleaner(DefaultCleanInterval);
+            _cleaner.Start();
             try
             {
                 _dicPools = new Dictionary<string, Pool>();
@@ -50,36 +53,39 @@ namespace ConnectionPool
                 {
                     var cfg =
                         JsonConvert.DeserializeObject<IDictionary<string, object>>(File.ReadAllText(cfgPath));
-                    _maxPoolSize = (int) cfg["maxPoolSize"];
-                    _maxLifeTimeSeconds = (int) cfg["lifeTimeSeconds"];
-                    _cleanPoolThreshold = (int) cfg["cleanPoolThreshold"];
+                    _busynessSeconds = (int) cfg["busynessSeconds"];
+                    _lifeTimeSeconds = (int) cfg["lifeTimeSeconds"];
+                    _poolSizeThreshold = (int) cfg["cleanPoolThreshold"];
                     return;
                 }
             }
             catch (Exception e)
             {
-                // ignored
+                Debug.WriteLine(e.StackTrace);
             }
 
-            _maxPoolSize = DefaultPoolSize;
-            _maxLifeTimeSeconds = DefaultLifeTime;
-            _cleanPoolThreshold = DefaultCleanPool;
+            _lifeTimeSeconds = DefaultLifeTime;
+            _poolSizeThreshold = DefaultPoolSizeThreshold;
+            _busynessSeconds = DefaultBusynessSeconds;
         }
 
         public Pool GetPool(string connectionString)
         {
             var key = GetPoolKey(connectionString);
+            if (string.IsNullOrEmpty(key))
+                throw new Exception("Can not get pool key");
             if (_dicPools.ContainsKey(key)) return _dicPools[key];
             var pool = new Pool(_dbConnectionFactory,
                 connectionString,
-                _maxPoolSize,
-                _maxLifeTimeSeconds,
-                _cleanPoolThreshold);
+                _lifeTimeSeconds,
+                _busynessSeconds,
+                _poolSizeThreshold);
             _dicPools.Add(key, pool);
+            _cleaner.AddPool(pool);
             return _dicPools[key];
         }
 
-        private string GetPoolKey(string connectionString)
+        private static string GetPoolKey(string connectionString)
         {
             return PoolUtils.GetSourceName(connectionString);
         }
@@ -95,9 +101,7 @@ namespace ConnectionPool
         public void CleanAll()
         {
             foreach (var pool in _dicPools.Select(kp => kp.Value))
-            {
                 pool.CleanAll();
-            }
         }
     }
 }

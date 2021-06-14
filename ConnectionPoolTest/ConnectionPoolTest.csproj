@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CleanPoolTest.cs" />
+    <Compile Include="ConnectionCleanerTest.cs" />
     <Compile Include="Constance.cs" />
     <Compile Include="PoolLimitedTest.cs" />
     <Compile Include="PoolSequenceTest.cs" />

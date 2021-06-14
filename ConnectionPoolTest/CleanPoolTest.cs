@@ -50,6 +50,7 @@ namespace ConnectionPoolTest
                     $"Number connection in the pool not correct.Target is {_numberConnection} per {poolSize} ");
                 return;
             }
+
             _pool.GetConnection();
             poolSize = _pool.GetPoolSize();
             if (poolSize != 1)

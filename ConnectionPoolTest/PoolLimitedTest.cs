@@ -15,7 +15,7 @@ namespace ConnectionPoolTest
         {
             _poolManager = new PoolManager(new OracleDbConnectionFactory(),
                 1,
-                1, 
+                1,
                 1);
         }
 
@@ -28,17 +28,6 @@ namespace ConnectionPoolTest
             connection = pool.GetConnection();
             pool.ReleaseConnection(connection);
             Assert.True(true);
-        }
-
-        [Test]
-        public void LimitedPool()
-        {
-            Assert.Throws<PoolLimitedException>(() =>
-            {
-                var pool = _poolManager.GetPool(Constance.ConnectionString);
-                pool.GetConnection();
-                pool.GetConnection();
-            });
         }
 
         [TearDown]
