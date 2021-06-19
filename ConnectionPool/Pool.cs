@@ -37,8 +37,8 @@ namespace ConnectionPool
             var connection = _poolStorage.GetFreeConnection();
             if (connection != null) return connection.Open();
             connection = CreateNew();
+            // _poolStorage.AddNewConnection(connection, false);
             connection.Active();
-            // _poolStorage.AddNewConnection(connection);
             return connection.Open();
         }
 

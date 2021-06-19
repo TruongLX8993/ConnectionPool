@@ -22,7 +22,7 @@ namespace ConnectionPoolDemo
             var log= LogManager.GetLogger(typeof(ConnectionState));
             var serverName = ConfigurationManager.AppSettings["ServerName"];
             var connectionString = ConfigurationManager.AppSettings["connectionString"];
-            var secondInterval = int.Parse(ConfigurationManager.AppSettings["secondInterval"]);
+            var secondInterval = float.Parse(ConfigurationManager.AppSettings["secondInterval"]);
             var con = OracleClientFactory.Instance.CreateConnection();
             if (con == null) throw new Exception("Can not create new connection");
             con.ConnectionString = connectionString;
@@ -45,7 +45,8 @@ namespace ConnectionPoolDemo
                 }
 
                 reader.Close();
-                Thread.Sleep(secondInterval * 1000);
+                Thread.Sleep((int)(secondInterval * 1000));
+                Thread.CurrentThread.
             }
         }
     }

@@ -12,10 +12,10 @@ namespace ConnectionPool
 {
     public class PoolManager
     {
-        private const int DefaultLifeTime = 60;
-        private const int DefaultBusynessSeconds = 40;
-        private const int DefaultPoolSizeThreshold = 100;
-        private const int DefaultCleanInterval = 120;
+        private const int DefaultLifeTime = 30;
+        private const int DefaultBusynessSeconds = 25;
+        private const int DefaultPoolSizeThreshold = 200;
+        private const int DefaultCleanInterval = 40;
 
         private readonly IDictionary<string, Pool> _dicPools;
         private readonly int _lifeTimeSeconds;
