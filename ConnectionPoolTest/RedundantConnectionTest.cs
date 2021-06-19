@@ -43,7 +43,7 @@ namespace ConnectionPoolTest
         [Test, Order(2)]
         public void Release()
         {
-            _pool.ReleaseConnection(_dbConnection);
+            _pool.ReturnConnection(_dbConnection);
         }
 
         [Test(ExpectedResult = 0), Order(3)]

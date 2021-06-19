@@ -50,7 +50,7 @@ namespace ConnectionPoolTest
                 return;
             }
 
-            _pool.ReleaseConnection(connection);
+            _pool.ReturnConnection(connection);
             _pool.GetConnection();
             poolSize = _pool.GetPoolSize();
             if (poolSize != _numberConnection - 1)

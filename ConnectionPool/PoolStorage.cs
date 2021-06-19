@@ -42,11 +42,11 @@ namespace ConnectionPool
 
         private Connection GetFromQueue()
         {
-            var con = _freeConnections.Dequeue();
-            if (con == null) return null;
-            if (_mapConnections.ContainsKey(con.DatabaseConnection))
-                _mapConnections.Remove(con.DatabaseConnection);
-            return con;
+          return _freeConnections.Dequeue();
+            // if (con == null) return null;
+            // if (_mapConnections.ContainsKey(con.DatabaseConnection))
+            //     _mapConnections.Remove(con.DatabaseConnection);
+            // return con;
         }
 
         public void AddNewConnection(Connection connection, bool enqueue = false)
@@ -110,16 +110,24 @@ namespace ConnectionPool
             }
         }
 
-        public void Clean(Func<Connection, bool> cleanCondition, bool reuseConnection = false)
+        public void UpdateStateConnections()
         {
-            var removedConnections = new List<Connection>();
             lock (_lock)
             {
-                var expiredConnections = GetConnections(cleanCondition);
-                removedConnections.AddRange(expiredConnections);
+                foreach (var connection in _mapConnections.Values)
+                {
+                    connection.UpdateState();
+                }
+            }
+        }
 
-                foreach (var connection in removedConnections.Where(connection => connection.Close()))
-                    Remove(connection);
+  
+        
+        public IList<Connection> GetConnections()
+        {
+            lock (_lock)
+            {
+                return _mapConnections.Values.ToList();
             }
         }
     }

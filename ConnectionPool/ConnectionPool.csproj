@@ -53,6 +53,7 @@
     <Compile Include="Exceptions\ConnectionPoolException.cs" />
     <Compile Include="Exceptions\StateException.cs" />
     <Compile Include="Extensions\DbConnectionExtension.cs" />
+    <Compile Include="IConnectionListener.cs" />
     <Compile Include="IDbConnectionFactory.cs" />
     <Compile Include="Pool.cs" />
     <Compile Include="PoolManager.cs" />

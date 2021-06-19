@@ -24,9 +24,9 @@ namespace ConnectionPoolTest
         {
             var pool = _poolManager.GetPool(Constance.ConnectionString);
             var connection = pool.GetConnection();
-            pool.ReleaseConnection(connection);
+            pool.ReturnConnection(connection);
             connection = pool.GetConnection();
-            pool.ReleaseConnection(connection);
+            pool.ReturnConnection(connection);
             Assert.True(true);
         }
 

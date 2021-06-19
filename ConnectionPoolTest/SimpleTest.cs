@@ -23,7 +23,7 @@ namespace ConnectionPoolTest
             var dbConnection = pool.GetConnection();
             var trans = dbConnection.BeginTransaction();
             pool = _poolManager.GetPool(trans.Connection.ConnectionString);
-            pool.ReleaseConnection(dbConnection);
+            pool.ReturnConnection(dbConnection);
             Assert.True(dbConnection != null && dbConnection.State == ConnectionState.Open);
         }
 

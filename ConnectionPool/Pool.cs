@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Data;
-using System.Diagnostics;
-using ConnectionPool.Extensions;
+using System.Linq;
 
 namespace ConnectionPool
 {
@@ -14,6 +13,8 @@ namespace ConnectionPool
         private readonly PoolStorage _poolStorage;
         private readonly IDbConnectionFactory _dbConnectionFactory;
         private readonly string _dbConnectionString;
+        private readonly object _lockTryClean = new object();
+
 
         public Pool(IDbConnectionFactory dbConnectionFactory,
             string dbConnectionString,
@@ -37,7 +38,7 @@ namespace ConnectionPool
             var connection = _poolStorage.GetFreeConnection();
             if (connection != null) return connection.Open();
             connection = CreateNew();
-            // _poolStorage.AddNewConnection(connection, false);
+            _poolStorage.AddNewConnection(connection);
             connection.Active();
             return connection.Open();
         }
@@ -52,36 +53,70 @@ namespace ConnectionPool
             return _poolStorage.GetNumberConnectionFree();
         }
 
-        public void ReleaseConnection(IDbConnection dbConnection)
+        public void ReturnConnection(IDbConnection dbConnection)
         {
-            var connection = new Connection(dbConnection, _lifeTimeSeconds, _busynessSeconds);
-            _poolStorage.Return(connection);
+            var connection = _poolStorage.GetConnection(dbConnection);
+            if (connection == null) return;
+            if (connection.Release())
+                _poolStorage.Return(connection);
         }
 
 
-        public void CleanExpiredConnection()
+        private void CleanExpiredConnection()
         {
-            _poolStorage.Clean(con =>
+            var removeStates = new[]
             {
-                var state = con.State;
-                return state == ConnectionState.Closed ||
-                       state == ConnectionState.Expired ||
-                       state == ConnectionState.MissRelease;
-            }, true);
+                ConnectionState.Closed,
+                ConnectionState.Expired,
+                ConnectionState.Broken
+            };
+
+            var reUseStates = new[]
+            {
+                ConnectionState.MissRecycle
+            };
+
+            var connections = _poolStorage.GetConnections();
+            foreach (var connection in connections)
+            {
+                connection.UpdateState();
+                var state = connection.State;
+                if (removeStates.Contains(state))
+                {
+                    if (connection.Close())
+                        _poolStorage.Remove(connection);
+                }
+
+                if (reUseStates.Contains(state))
+                {
+                    if (connection.Release())
+                    {
+                        _poolStorage.Return(connection);
+                    }
+                }
+            }
+
             _lastClean = DateTime.Now;
         }
 
         public void CleanAll()
         {
-            _poolStorage.Clean(con => true);
-            _lastClean = DateTime.Now;
+            var connections = _poolStorage.GetConnections();
+            foreach (var connection in connections)
+            {
+                if (connection.Close())
+                    _poolStorage.Remove(connection);
+            }
         }
 
         public void TryClean()
         {
-            var dur = (DateTime.Now - _lastClean).TotalSeconds;
-            if (!(dur >= _lifeTimeSeconds) && GetPoolSize() <= _poolSizeThreshold) return;
-            CleanExpiredConnection();
+            lock (_lockTryClean)
+            {
+                var dur = (DateTime.Now - _lastClean).TotalSeconds;
+                if (!(dur >= _lifeTimeSeconds) && GetPoolSize() <= _poolSizeThreshold) return;
+                CleanExpiredConnection();
+            }
         }
 
         private Connection CreateNew()

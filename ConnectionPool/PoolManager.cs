@@ -12,10 +12,10 @@ namespace ConnectionPool
 {
     public class PoolManager
     {
-        private const int DefaultLifeTime = 30;
-        private const int DefaultBusynessSeconds = 25;
-        private const int DefaultPoolSizeThreshold = 200;
-        private const int DefaultCleanInterval = 40;
+        private const int DefaultLifeTime = 120;
+        private const int DefaultBusynessSeconds = 60;
+        private const int DefaultPoolSizeThreshold = 300;
+        private const int DefaultCleanInterval = 30;
 
         private readonly IDictionary<string, Pool> _dicPools;
         private readonly int _lifeTimeSeconds;
@@ -37,14 +37,14 @@ namespace ConnectionPool
             _busynessSeconds = busynessSeconds;
             _poolSizeThreshold = poolSizeThreshold;
             _cleaner = new ConnectionCleaner(DefaultCleanInterval);
-            _cleaner.Start();
+            // _cleaner.Start();
         }
 
         public PoolManager(IDbConnectionFactory dbConnectionFactory)
         {
             _dbConnectionFactory = dbConnectionFactory;
             _cleaner = new ConnectionCleaner(DefaultCleanInterval);
-            _cleaner.Start();
+            // _cleaner.Start();
             try
             {
                 _dicPools = new Dictionary<string, Pool>();
@@ -74,6 +74,7 @@ namespace ConnectionPool
             var key = GetPoolKey(connectionString);
             if (string.IsNullOrEmpty(key))
                 throw new Exception("Can not get pool key");
+            Debug.Print($"pool number:{_dicPools.Count}");
             if (_dicPools.ContainsKey(key)) return _dicPools[key];
             var pool = new Pool(_dbConnectionFactory,
                 connectionString,
@@ -94,7 +95,7 @@ namespace ConnectionPool
         {
             foreach (var pool in _dicPools.Select(kp => kp.Value))
             {
-                pool.CleanExpiredConnection();
+                pool.TryClean();
             }
         }
 

@@ -46,7 +46,6 @@ namespace ConnectionPoolDemo
 
                 reader.Close();
                 Thread.Sleep((int)(secondInterval * 1000));
-                Thread.CurrentThread.
             }
         }
     }

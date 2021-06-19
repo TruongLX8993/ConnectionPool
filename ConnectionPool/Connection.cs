@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Data.Odbc;
-using System.Linq;
 using ConnectionPool.Exceptions;
 using ConnectionPool.Extensions;
-using ConnectionPool.Utils;
 
 namespace ConnectionPool
 {
@@ -15,7 +11,7 @@ namespace ConnectionPool
         Active,
         Busy,
         Executing,
-        MissRelease,
+        MissRecycle,
         Broken,
         Closed,
         Expired,
@@ -29,9 +25,10 @@ namespace ConnectionPool
         private readonly int _maxBusySeconds;
         private readonly object _lockState = new object();
         private ConnectionState _state;
-        private readonly IDbConnection _dbConnection;
         private bool _openedFlag;
         private ConnectionState? _prevState;
+        private IConnectionListener _listener;
+
 
         public Connection(IDbConnection dbConnection,
             int lifeTimeSeconds,
@@ -40,30 +37,56 @@ namespace ConnectionPool
             State = ConnectionState.Free;
             _lifeTimeSeconds = lifeTimeSeconds;
             _maxBusySeconds = maxBusySeconds;
-            _dbConnection = dbConnection;
+            DatabaseConnection = dbConnection;
         }
 
-        public IDbConnection DatabaseConnection
+        public IDbConnection DatabaseConnection { get; }
+
+
+        public void Update()
         {
-            get { return _dbConnection; }
+            lock (_lockState)
+            {
+                var newState = GetNewState();
+                if (newState == ConnectionState.Expired || newState == ConnectionState.Closed || newState == ConnectionState.Broken)
+                {
+                    if (Close())
+                    {
+                        _listener.OnClose(this);
+                    }
+                }
+
+                if (newState == ConnectionState.MissRecycle)
+                {
+                    State = ConnectionState.Free;
+                    _listener.OnRecycle(this);
+                }
+                
+                if()
+                
+            }
+        }
+
+        public ConnectionState GetAndUpdateState()
+        {
+            UpdateState();
+            return _state;
+        }
+
+        public void UpdateState()
+        {
+            lock (_lockState)
+            {
+                var newState = GetNewState();
+                if (newState == null || newState.Value == _state)
+                    return;
+                State = newState.Value;
+            }
         }
 
         public ConnectionState State
         {
-            get
-            {
-                lock (_lockState)
-                {
-                    var newState = GetNewState();
-                    if (newState == null || newState.Value == _state)
-                        return _state;
-                    _lastUpdateTime = DateTime.Now;
-                    _prevState = _state;
-                    _prevState = _state;
-                    _state = newState.Value;
-                    return _state;
-                }
-            }
+            get => _state;
             private set
             {
                 lock (_lockState)
@@ -89,85 +112,83 @@ namespace ConnectionPool
         }
 
 
-        public IDbConnection Open()
+        public IDbConnection Open(bool freshState = false)
         {
             lock (_lockState)
             {
-                var currentState = State;
+                if (freshState)
+                    UpdateState();
                 if (_state != ConnectionState.Active)
-                    throw new StateException(currentState, ConnectionState.Active);
-                if (_dbConnection.State == System.Data.ConnectionState.Closed)
-                    _dbConnection.Open();
+                    throw new StateException(_state, ConnectionState.Active);
+                if (DatabaseConnection.State == System.Data.ConnectionState.Closed)
+                    DatabaseConnection.Open();
                 State = ConnectionState.Busy;
                 _openedFlag = true;
-                return _dbConnection;
+                return DatabaseConnection;
             }
         }
 
-        public bool Release()
+        public bool Release(bool freshState = false)
         {
             lock (_lockState)
             {
-                var currentState = State;
-                if (currentState == ConnectionState.Closed ||
-                    currentState == ConnectionState.Broken ||
-                    currentState == ConnectionState.Executing)
+                if (freshState)
+                    UpdateState();
+
+                if (_state == ConnectionState.Closed ||
+                    _state == ConnectionState.Broken ||
+                    _state == ConnectionState.Executing)
                     return false;
                 State = ConnectionState.Free;
                 return true;
             }
         }
 
-        public bool Close()
+        public bool Close(bool freshState = false)
         {
             lock (_lockState)
             {
+                if (freshState)
+                    UpdateState();
 
-                if (!_dbConnection.CloseAndDispose())
+                if (_state == ConnectionState.Executing)
+                    return false;
+
+                if (!DatabaseConnection.CloseAndDispose())
                     return false;
                 State = ConnectionState.Closed;
                 return true;
             }
         }
 
-        // private static bool CanCloseDbConnection(ConnectionState currentState, ConnectionState? prevState)
-        // {
-        //     if (currentState == ConnectionState.Free || currentState == ConnectionState.Broken)
-        //         return true;
-        //     if (currentState == ConnectionState.Expired)
-        //     {
-        //         var prevStates = new List<ConnectionState> {ConnectionState.Broken, ConnectionState.Free,C};
-        //         if (prevState == null || prevStates.Contains(prevState.Value))
-        //             return true;
-        //     }
-        //
-        //     return false;
-        // }
-
         private ConnectionState? GetNewState()
         {
             lock (_lockState)
             {
-                if (_openedFlag && !_dbConnection.HasConnect())
+                if (_state == ConnectionState.Closed)
+                    return _state;
+
+                if (_openedFlag && !DatabaseConnection.HasConnect())
                 {
                     return ConnectionState.Broken;
                 }
 
-                if (_dbConnection.IsExecuting())
+                if (DatabaseConnection.IsExecuting())
                 {
                     return ConnectionState.Executing;
                 }
 
 
-                if (IsBusyTimeout())
+                if (IsBusyTimeout() && (_state == ConnectionState.Busy || _state == ConnectionState.Active))
                 {
-                    State = ConnectionState.MissRelease;
+                    return ConnectionState.MissRecycle;
                 }
 
                 if (IsExpired())
                 {
-                    State = ConnectionState.Expired;
+                    return ConnectionState.Expired;
                 }
+
                 return null;
             }
         }
